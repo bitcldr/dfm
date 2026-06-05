@@ -134,6 +134,14 @@ pub fn run(args: impl IntoIterator<Item = String>) -> i32 {
         return 1;
     }
 
+    // Install the diagnostics logger so engine `log::warn!`/`debug!` calls
+    // (e.g. failed links, skipped cleans) are actually visible, and so
+    // `--verbose` enables debug tracing.
+    crate::logging::init(crate::logging::level_from_flags(
+        cli.globals.verbose,
+        cli.globals.quiet,
+    ));
+
     let mut io = IoStreams::new(cli.globals.color.into());
     if cli.globals.quiet {
         io.set_quiet(true);

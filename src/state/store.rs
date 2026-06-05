@@ -96,7 +96,21 @@ impl<E: Env> Store<E> {
             std::fs::create_dir_all(parent).map_err(StateError::Mkdir)?;
         }
         let data = serde_json::to_vec_pretty(state).map_err(StateError::Marshal)?;
-        std::fs::write(&p, &data).map_err(|source| StateError::Write { path: p, source })
+
+        // Write to a sibling temp file then rename over the target. rename is
+        // atomic on POSIX within one filesystem, so a crash mid-write can never
+        // leave a truncated state.json — readers see either the old or the new
+        // file, never a partial one. The temp name carries the pid so two
+        // concurrent `dfm apply` runs don't clobber each other's temp file.
+        let tmp = p.with_extension(format!("json.tmp.{}", std::process::id()));
+        std::fs::write(&tmp, &data).map_err(|source| StateError::Write {
+            path: tmp.clone(),
+            source,
+        })?;
+        std::fs::rename(&tmp, &p).map_err(|source| {
+            let _ = std::fs::remove_file(&tmp); // best-effort cleanup
+            StateError::Write { path: p, source }
+        })
     }
 }
 

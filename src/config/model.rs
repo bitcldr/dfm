@@ -70,8 +70,9 @@ pub struct Defaults {
     pub clean: Option<CleanOptions>,
 }
 
-/// Per-link options. All fields are `Option<_>` so "unset" is distinct from
-/// "explicitly false/empty" when merging defaults.
+/// Per-link options. Scalar fields are `Option<_>` so "unset" is distinct from
+/// "explicitly false/empty" when merging defaults; `exclude` is a plain `Vec`
+/// where empty means "unset".
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct LinkOptions {
     /// Source path relative to the base dir (or absolute).
@@ -80,7 +81,9 @@ pub struct LinkOptions {
     pub create: Option<bool>,
     /// Replace a symlink that points elsewhere.
     pub relink: Option<bool>,
-    /// Back up and replace a non-symlink target (accepted; currently a no-op).
+    /// Alias for `relink` (dotbot compatibility): replace a symlink pointing
+    /// elsewhere. Non-symlink targets are always backed up and replaced
+    /// regardless of this flag.
     pub force: Option<bool>,
     /// Store a relative path in the symlink.
     pub relative: Option<bool>,
@@ -150,7 +153,9 @@ pub struct Shell {
 /// Per-target clean flags.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct CleanOptions {
-    /// Reserved.
+    /// Remove dead symlinks even when they point outside the base directory.
+    /// Bounded for safety: the scanned target must resolve under `$HOME`, and
+    /// recursion depth is capped.
     pub force: Option<bool>,
     /// Recurse into subdirectories.
     pub recursive: Option<bool>,
