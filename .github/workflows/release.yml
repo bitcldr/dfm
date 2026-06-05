@@ -23,7 +23,7 @@ jobs:
             os: macos-14
             label: macos_arm64
           - target: x86_64-apple-darwin
-            os: macos-13
+            os: macos-latest
             label: macos_x86_64
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
@@ -46,7 +46,7 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      # Linux arm64 needs a cross-linker.
+      # Cross-compile targets need their rust-std added to the 1.96 toolchain slot.
       - name: install aarch64 linux linker
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
@@ -55,6 +55,10 @@ jobs:
           mkdir -p .cargo
           printf '[target.aarch64-unknown-linux-gnu]\nlinker = "aarch64-linux-gnu-gcc"\n' >> .cargo/config.toml
           rustup target add aarch64-unknown-linux-gnu
+
+      - name: add cross-compile target
+        if: matrix.target == 'x86_64-apple-darwin'
+        run: rustup target add x86_64-apple-darwin
 
       - name: build
         run: cargo build --release --locked --target ${{ matrix.target }}
