@@ -43,6 +43,8 @@ jobs:
           targets: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
 
       # Linux arm64 needs a cross-linker.
       - name: install aarch64 linux linker
