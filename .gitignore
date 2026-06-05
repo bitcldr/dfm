@@ -5,3 +5,6 @@ coverage.out
 .DS_Store
 .idea/
 .vscode/
+
+# Rust
+/target/

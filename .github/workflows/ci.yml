@@ -8,29 +8,66 @@ on:
 permissions:
   contents: read
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0 # build.rs runs `git describe`
 
-      - uses: actions/setup-go@v6
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          go-version: "1.26"
-          cache: true
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: fmt
+        run: cargo fmt --all --check
+
+      - name: clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: build
-        run: go build ./...
+        run: cargo build --all-targets
 
-      - name: test (race)
-        run: go test -race -coverprofile=coverage.out ./...
+      - name: test
+        run: cargo test --all-features
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
 
       - name: coverage summary
-        run: go tool cover -func=coverage.out | tail -1
+        run: cargo llvm-cov --all-features --summary-only
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
         with:
-          version: "v2.11.1"
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@1.96.0 # keep in sync with rust-toolchain.toml
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: build on MSRV
+        run: cargo build

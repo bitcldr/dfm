@@ -8,25 +8,163 @@ on:
 permissions:
   contents: write
 
+env:
+  CARGO_TERM_COLOR: always
+  BIN: dfm
+
 jobs:
-  goreleaser:
-    runs-on: ubuntu-latest
+  # Build one tarball per target on a native runner.
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-14
+            label: macos_arm64
+          - target: x86_64-apple-darwin
+            os: macos-13
+            label: macos_x86_64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            label: linux_arm64
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            label: linux_x86_64
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: check out code
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           persist-credentials: false
-          fetch-depth: 0
+          fetch-depth: 0 # build.rs runs `git describe`
 
-      - name: set up go
-        uses: actions/setup-go@v6
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          go-version: "1.26"
+          targets: ${{ matrix.target }}
 
-      - name: run goreleaser
-        uses: goreleaser/goreleaser-action@v7
+      - uses: Swatinem/rust-cache@v2
+
+      # Linux arm64 needs a cross-linker.
+      - name: install aarch64 linux linker
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          mkdir -p .cargo
+          printf '[target.aarch64-unknown-linux-gnu]\nlinker = "aarch64-linux-gnu-gcc"\n' >> .cargo/config.toml
+
+      - name: build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: package
+        id: package
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          name="${BIN}_${tag}_${{ matrix.label }}"
+          staging="$name"
+          mkdir -p "$staging"
+          cp "target/${{ matrix.target }}/release/${BIN}" "$staging/"
+          cp README.md LICENSE "$staging/"
+          cp -r docs "$staging/"
+          tar -czf "${name}.tar.gz" "$staging"
+          shasum -a 256 "${name}.tar.gz" > "${name}.tar.gz.sha256"
+          echo "archive=${name}.tar.gz" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
         with:
-          version: latest
-          args: release --clean
+          name: ${{ matrix.label }}
+          path: |
+            ${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.archive }}.sha256
+
+  # Attach all archives to a GitHub Release.
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/*.sha256
+          generate_release_notes: true
+
+  # Generate the Homebrew formula and push it to the tap repo.
+  homebrew:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: render formula
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          repo="${GITHUB_REPOSITORY}"
+          base="https://github.com/${repo}/releases/download/${tag}"
+          sha() { cut -d' ' -f1 "dist/${BIN}_${tag}_$1.tar.gz.sha256"; }
+
+          mkdir -p Formula
+          cat > "Formula/${BIN}.rb" <<EOF
+          class Dfm < Formula
+            desc "Standalone single-binary dotfiles manager"
+            homepage "https://github.com/${repo}"
+            version "${version}"
+            license "MIT"
+
+            on_macos do
+              on_arm do
+                url "${base}/${BIN}_${tag}_macos_arm64.tar.gz"
+                sha256 "$(sha macos_arm64)"
+              end
+              on_intel do
+                url "${base}/${BIN}_${tag}_macos_x86_64.tar.gz"
+                sha256 "$(sha macos_x86_64)"
+              end
+            end
+
+            on_linux do
+              on_arm do
+                url "${base}/${BIN}_${tag}_linux_arm64.tar.gz"
+                sha256 "$(sha linux_arm64)"
+              end
+              on_intel do
+                url "${base}/${BIN}_${tag}_linux_x86_64.tar.gz"
+                sha256 "$(sha linux_x86_64)"
+              end
+            end
+
+            def install
+              bin.install "${BIN}"
+            end
+
+            test do
+              system "#{bin}/${BIN}", "--help"
+            end
+          end
+          EOF
+          cat "Formula/${BIN}.rb"
+
+      - name: push formula to tap
         env:
-          GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/bitcldr/homebrew-tap.git" tap
+          mkdir -p tap/Formula
+          cp "Formula/${BIN}.rb" tap/Formula/
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "Formula/${BIN}.rb"
+          git commit -m "${BIN} ${tag}"
+          git push

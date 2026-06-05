@@ -1,0 +1,49 @@
+[package]
+name = "dfm"
+version = "0.3.0"
+edition = "2024"
+rust-version = "1.96"
+license = "MIT"
+description = "Standalone single-binary dotfiles manager"
+homepage = "https://github.com/bitcldr/dfm"
+repository = "https://github.com/bitcldr/dfm"
+default-run = "dfm"
+
+[[bin]]
+name = "dfm"
+path = "src/main.rs"
+
+[lib]
+name = "dfm"
+path = "src/lib.rs"
+
+[dependencies]
+marked-yaml = "0.8.0"
+thiserror = "2"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
+anstyle = "1"
+pathdiff = "0.2"
+log = "0.4"
+
+[dev-dependencies]
+tempfile = "3"
+serial_test = "3"
+assert_cmd = "2"
+predicates = "3"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# pragmatic opt-outs: these fire heavily on faithful ports and add noise
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+
+[profile.release]
+strip = "symbols"
+lto = true

@@ -4,20 +4,21 @@ Standalone, single-binary dotfiles manager. Profile format is inspired by [dotbo
 
 ## Install
 
-**macOS (Homebrew)**
+**macOS / Linux (Homebrew)**
 
 ```sh
-brew tap bitcldr/tap
-brew install dfm
+brew install bitcldr/tap/dfm
 ```
 
-**Linux / macOS (shell script)**
+**Prebuilt binary**
+
+Download the archive for your platform from the [latest release](https://github.com/bitcldr/dfm/releases/latest) (darwin/linux × x86_64/arm64), extract it, and put `dfm` on your `PATH`.
+
+**From source**
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/bitcldr/dfm/main/scripts/install.sh | sh
+cargo install --git https://github.com/bitcldr/dfm
 ```
-
-Drops `dfm` into `~/.local/bin` (override with `DFM_INSTALL_DIR`). Pin a version with `DFM_VERSION=vX.Y.Z`.
 
 ## Quick start
 
@@ -33,6 +34,7 @@ Profiles are read from `./profiles/<name>.conf.yaml` relative to the base dir (`
 | ------------------------ | ---------------------------------------- |
 | `dfm apply <profile>...` | Apply one or more profiles in order      |
 | `dfm apply --dry-run`    | Report planned changes without writing   |
+| `dfm apply --no-shell`   | Apply links/dirs/cleans, skip `shell:`   |
 | `dfm diff <profile>`     | Show planned changes, no writes          |
 | `dfm doctor`             | Verify installed symlinks still resolve  |
 | `dfm status`             | Show last applied profiles and timestamp |
@@ -62,7 +64,6 @@ Completes subcommands, flags, and profile names (via `dfm list`). Set `$DFM_DIR`
 
 Directives: `defaults`, `link`, `shell`, `clean`, `create`. Unknown directives are rejected.
 
-- `when:` — gate any directive on `os`, `arch`, or `hostname`
 - Non-symlink targets are backed up to `~/.dotfiles-backup/<timestamp>/` instead of failing
 - `shell` entries use `name:` + `script:` (multiline blocks supported)
 

@@ -165,6 +165,11 @@ shell:
 > top yourself. A script exiting non-zero is recorded as a failure in
 > the tally but does **not** abort the run; subsequent directives still
 > execute.
+>
+> **Skipping shell.** Run `dfm apply --no-shell` to apply only the
+> `link`, `clean`, and `create` directives and skip every `shell:` block —
+> useful when you want the symlinks without running install scripts.
+> `dfm diff` never executes shell commands (it only reports them).
 
 ## `clean`
 
@@ -218,10 +223,11 @@ create:
 
 Mode literals accept octal (`0o700` or `0700`) and decimal.
 
-## Conditionals (`when:`)
+## Conditionals
 
-`when:` is not yet supported. Per-entry conditionals are planned for a
-future release.
+Conditional directives are not supported. Every directive in a profile
+always runs. Split host- or OS-specific setup into separate profiles and
+select them at apply time (e.g. `dfm apply base macos`).
 
 ## Path expansion
 

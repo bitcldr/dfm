@@ -1,0 +1,30 @@
+# Configuration for cargo-dist (https://opensource.axo.dev/cargo-dist/).
+#
+# Run `dist init` then `dist generate` to (re)generate
+# `.github/workflows/release.yml` from this file. The committed release
+# workflow is a hand-written equivalent; if you adopt `dist`, let it own the
+# workflow and keep this file as the source of truth.
+
+[workspace]
+members = ["cargo:."]
+
+[dist]
+# The preferred dist version to use in CI (pin before first release).
+cargo-dist-version = "0.32.0"
+# CI backends to support.
+ci = "github"
+# Installers to generate for the release.
+installers = ["shell", "homebrew"]
+# Publish the generated Homebrew formula to this tap repository.
+tap = "bitcldr/homebrew-tap"
+# Target platforms: darwin + linux, x86_64 + arm64.
+targets = [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-unknown-linux-gnu",
+]
+# Build darwin targets on native macOS runners (reliable over cross-compiling).
+[dist.github-custom-runners]
+aarch64-apple-darwin = "macos-14"
+x86_64-apple-darwin = "macos-13"
