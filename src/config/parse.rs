@@ -792,4 +792,14 @@ link:
         assert_eq!(c.entries[0].target, "~");
         assert_eq!(c.entries[0].options.recursive, Some(true));
     }
+
+    #[test]
+    fn malformed_yaml_is_a_clean_error() {
+        // Unbalanced flow mapping is a scanner error, not a panic. It must come
+        // back as a typed ParseError (not propagate a foreign marked-yaml type).
+        for src in ["link: {unterminated\n", "link:\n  - : :\n", "\t- bad tab\n"] {
+            let err = parse_str(src);
+            assert!(err.is_err(), "expected a parse error for {src:?}");
+        }
+    }
 }

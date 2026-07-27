@@ -13,7 +13,13 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Run on both primary targets — symlink/path semantics differ between
+    # Linux and macOS, so both must pass.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -25,6 +31,8 @@ jobs:
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}
 
       - name: fmt
         run: cargo fmt --all --check
@@ -71,3 +79,15 @@ jobs:
 
       - name: build on MSRV
         run: cargo build
+
+  # Supply-chain audit: advisories, license policy, and banned/duplicate deps.
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources

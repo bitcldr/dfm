@@ -9,8 +9,8 @@ fail fast instead of silently doing nothing.
 ## File layout
 
 A profile is a single YAML document whose root is a **mapping**. Each
-key is a directive name; the value is the directive body. Order is
-preserved (yaml.v3 maintains insertion order) and equal to execution order.
+key is a directive name; the value is the directive body. Mapping key
+order is preserved and equal to execution order.
 
 ```yaml
 # profiles/base.conf.yaml
@@ -101,10 +101,10 @@ link:
 | `path`           | string                  | Source path relative to the profile dir (or absolute). Defaults to the target's basename stripped of a leading dot when omitted. |
 | `create`         | bool                    | Create the target's parent directory if missing. Default `false` (set globally via `defaults`).                                  |
 | `relink`         | bool                    | If target is a symlink pointing elsewhere, unlink and recreate. Default `false`.                                                 |
-| `force`          | bool                    | If target is a non-symlink, back it up and replace. `dfm` always backs up; this flag is accepted but is currently a no-op.       |
+| `force`          | bool                    | Alias for `relink` (dotbot compatibility): replace a symlink pointing elsewhere. Non-symlink targets are always backed up and replaced regardless of this flag.       |
 | `relative`       | bool                    | Store a relative path in the symlink instead of an absolute one. Default `false`.                                                |
 | `glob`           | bool                    | Treat `path` as a glob and create one symlink per match. **Reserved** — glob support is deferred; using it currently errors.     |
-| `ignore-missing` | bool                    | If `path` doesn't exist, skip silently. Default `false`.                                                                         |
+| `ignore-missing` | bool                    | Skip the source-exists check and create the link anyway (it may dangle until the source appears), instead of failing on a missing `path`. Default `false`. |
 | `backup`         | bool                    | Reserved for forward-compat; `dfm` always backs up.                                                                              |
 | `type`           | `symlink` \| `hardlink` | Default `symlink`. Hardlinks are reserved.                                                                                       |
 | `canonicalize`   | bool                    | Resolve symlinks in `path` before linking. Alias: `canonicalize-path`.                                                           |
@@ -118,7 +118,7 @@ link:
 2. If the target is already a symlink pointing at the correct source →
    no-op, recorded as `link-ok`.
 3. If the target is a symlink to a different place:
-   - `relink: true` → replace it (`relink` action).
+   - `relink: true` (or `force: true`) → replace it (`relink` action).
    - otherwise → `skip`, with a warning.
 4. If the target exists and is **not** a symlink (regular file or
    directory) → move to `~/.dotfiles-backup/<rfc3339>/<path>` and
@@ -196,10 +196,18 @@ clean:
 
 ### Clean options
 
-| Key         | Type | Meaning                                       |
-| ----------- | ---- | --------------------------------------------- |
-| `force`     | bool | Reserved. Default `false`.                    |
-| `recursive` | bool | Recurse into subdirectories. Default `false`. |
+| Key         | Type | Meaning                                                                                                                                                                            |
+| ----------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `force`     | bool | Remove dead symlinks even when they point **outside** the base directory. Bounded for safety: the scanned target must resolve under `$HOME`, and recursion is capped at depth 5. Default `false`. |
+| `recursive` | bool | Recurse into subdirectories. Default `false`.                                                                                                                                    |
+
+> **`force` safety.** Without `force`, `clean` only removes dead symlinks
+> pointing back into the base dir. `force` widens that to any dead symlink in
+> the scanned tree, but only when the scanned directory is under `$HOME`, and
+> `force` + `recursive` stops descending past 5 levels — so a misconfigured
+> `clean: { "/": { force: true, recursive: true } }` cannot walk the whole
+> filesystem. `clean` only ever removes **dead** symlinks; it never deletes
+> live files or directories.
 
 ## `create`
 

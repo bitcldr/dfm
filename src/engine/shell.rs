@@ -5,6 +5,7 @@
 //! still run. `set -e` is not injected; the script is handed to the shell
 //! verbatim.
 
+use std::io::Write;
 use std::process::{Command, Stdio};
 
 use crate::config::Shell;
@@ -12,6 +13,16 @@ use crate::config::Shell;
 use super::action::ActionKind;
 use super::core::{Engine, Tally, bool_or, merge_shell_opts};
 use super::sink::OutputSink;
+
+/// Report a failed shell command directly on stderr so it is visible
+/// regardless of log level or quiet mode, then also log it for tracing.
+fn report_shell_failure(command: &str, reason: &str) {
+    let _ = writeln!(
+        std::io::stderr(),
+        "dfm: shell command failed ({reason}): {command}"
+    );
+    log::warn!("command failed [{command}]: {reason}");
+}
 
 impl<S: OutputSink> Engine<S> {
     /// Execute a `shell:` directive.
@@ -39,7 +50,10 @@ impl<S: OutputSink> Engine<S> {
             let mut cmd = Command::new("/bin/sh");
             cmd.arg("-c").arg(&item.command).current_dir(&self.base_dir);
 
-            // Inherit the selected streams; otherwise the child's are dropped.
+            // Stream selection. stderr defaults to inherited so a command's
+            // own error output is never silently swallowed; stdin/stdout
+            // default off. `quiet` suppresses the inherited streams but never
+            // hides a failure (handled below).
             cmd.stdin(if bool_or(opts.stdin, false) {
                 Stdio::inherit()
             } else {
@@ -50,7 +64,7 @@ impl<S: OutputSink> Engine<S> {
             } else {
                 Stdio::null()
             });
-            cmd.stderr(if !quiet && bool_or(opts.stderr, false) {
+            cmd.stderr(if !quiet && bool_or(opts.stderr, true) {
                 Stdio::inherit()
             } else {
                 Stdio::null()
@@ -61,11 +75,17 @@ impl<S: OutputSink> Engine<S> {
                 Ok(status) if status.success() => {}
                 Ok(status) => {
                     tally.shell_failed += 1;
-                    log::warn!("command failed [{}]: exit {status}", item.command);
+                    // A failed command must be visible regardless of log
+                    // config or quiet — surface it directly on stderr.
+                    let reason = match status.code() {
+                        Some(code) => format!("exit code {code}"),
+                        None => "terminated by signal".to_string(),
+                    };
+                    report_shell_failure(&item.command, &reason);
                 }
                 Err(e) => {
                     tally.shell_failed += 1;
-                    log::warn!("command failed [{}]: {e}", item.command);
+                    report_shell_failure(&item.command, &e.to_string());
                 }
             }
         }

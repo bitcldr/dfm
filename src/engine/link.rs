@@ -183,7 +183,7 @@ impl<S: OutputSink> Engine<S> {
         }
         if !self.backup_initialized() {
             let home = self
-                .backup_home_dir()
+                .home_dir()
                 .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "home dir"))?;
             let tag = self.backup_tag.clone();
             backup::init_root(&mut self.backup, &home, &tag, self.dry_run)?;

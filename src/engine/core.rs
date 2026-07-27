@@ -33,6 +33,20 @@ pub struct Tally {
     pub created: u32,
 }
 
+impl std::ops::AddAssign for Tally {
+    /// Accumulate another tally field-by-field, so totals can span profiles.
+    fn add_assign(&mut self, rhs: Self) {
+        self.links_ok += rhs.links_ok;
+        self.links_created += rhs.links_created;
+        self.links_relinked += rhs.links_relinked;
+        self.links_backed_up += rhs.links_backed_up;
+        self.shell_run += rhs.shell_run;
+        self.shell_failed += rhs.shell_failed;
+        self.cleaned += rhs.cleaned;
+        self.created += rhs.created;
+    }
+}
+
 /// A fatal error that aborts an `apply` run. Per-entry failures (one bad link,
 /// one failing shell command) do not abort — they are tallied and logged.
 #[derive(Debug, thiserror::Error)]
@@ -97,8 +111,12 @@ pub struct Engine<S: OutputSink = NullSink> {
     pub(crate) backup: BackupWriter,
     /// Shared timestamp tag for all backups in this run.
     pub(crate) backup_tag: String,
-    /// Backup root's home directory. `None` falls back to `$HOME`.
-    pub(crate) backup_home: Option<PathBuf>,
+    /// Overrides `$HOME` for the backup root and the clean-force `$HOME`
+    /// containment guard. `None` falls back to the real `$HOME`. Injectable so
+    /// these home-relative behaviors are testable without mutating the
+    /// environment (which is `unsafe` in edition 2024 and racy under parallel
+    /// test threads).
+    pub(crate) home_override: Option<PathBuf>,
     /// Cancellation flag, checked between directives.
     pub(crate) cancel: Arc<AtomicBool>,
 }
@@ -117,7 +135,7 @@ impl Engine<NullSink> {
             defaults: MergedDefaults::default(),
             backup: BackupWriter::default(),
             backup_tag: String::new(),
-            backup_home: None,
+            home_override: None,
             cancel: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -135,7 +153,7 @@ impl<S: OutputSink> Engine<S> {
             defaults: self.defaults,
             backup: self.backup,
             backup_tag: self.backup_tag,
-            backup_home: self.backup_home,
+            home_override: self.home_override,
             cancel: self.cancel,
         }
     }
@@ -226,17 +244,18 @@ impl<S: OutputSink> Engine<S> {
         self.backup_tag = tag.into();
     }
 
-    /// Override the home directory under which backups are written. When unset,
-    /// `$HOME` is used.
+    /// Override the home directory used for the backup root and the
+    /// clean-force `$HOME` guard. When unset, the real `$HOME` is used.
+    /// Primarily a test seam (avoids mutating the process environment).
     #[must_use]
-    pub fn with_backup_home(mut self, home: impl Into<PathBuf>) -> Self {
-        self.backup_home = Some(home.into());
+    pub fn with_home(mut self, home: impl Into<PathBuf>) -> Self {
+        self.home_override = Some(home.into());
         self
     }
 
-    /// The backup home: the explicit override, else `$HOME`.
-    pub(crate) fn backup_home_dir(&self) -> Option<PathBuf> {
-        self.backup_home.clone().or_else(home_dir)
+    /// The effective home directory: the injected override, else `$HOME`.
+    pub(crate) fn home_dir(&self) -> Option<PathBuf> {
+        self.home_override.clone().or_else(home_dir)
     }
 }
 

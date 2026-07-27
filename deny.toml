@@ -1,0 +1,31 @@
+# cargo-deny configuration (https://embarkstudios.github.io/cargo-deny/).
+# Run locally with `cargo deny check`.
+
+[advisories]
+# Fail on security advisories for any dependency.
+yanked = "deny"
+
+[bans]
+# Flag multiple versions of the same crate (bloat / drift), but allow skipping
+# known-unavoidable duplicates here if they arise.
+multiple-versions = "warn"
+wildcards = "deny"
+
+[licenses]
+# Permissive licenses acceptable for a MIT-licensed binary's dependency tree.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+]
+confidence-threshold = 0.9
+
+[sources]
+# Only crates.io is an allowed registry; no git or unknown sources.
+unknown-registry = "deny"
+unknown-git = "deny"

@@ -4,6 +4,8 @@
 //! color is enabled, otherwise returning the text unchanged — so the caller
 //! decides per-stream whether ANSI is emitted.
 
+use std::borrow::Cow;
+
 use anstyle::{AnsiColor, Style};
 
 /// Bold (no color).
@@ -39,11 +41,12 @@ pub(crate) const fn arrow() -> &'static str {
 ///
 /// Uses `anstyle`'s `render`/`render_reset` so the emitted SGR sequence is the
 /// style's own representation, wrapping the styled token with a trailing reset.
-pub(crate) fn paint(style: Style, text: &str, enabled: bool) -> String {
+/// Returns a borrowed `Cow` when color is off (no allocation).
+pub(crate) fn paint(style: Style, text: &str, enabled: bool) -> Cow<'_, str> {
     if !enabled {
-        return text.to_string();
+        return Cow::Borrowed(text);
     }
-    format!("{}{text}{}", style.render(), style.render_reset())
+    Cow::Owned(format!("{}{text}{}", style.render(), style.render_reset()))
 }
 
 #[cfg(test)]

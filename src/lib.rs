@@ -8,5 +8,6 @@ pub mod cli;
 pub mod config;
 pub mod engine;
 pub mod iostreams;
+pub mod logging;
 pub mod state;
 pub mod version;

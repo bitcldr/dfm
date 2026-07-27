@@ -59,10 +59,10 @@ pub fn run(args: &ApplyArgs, ctx: &mut Ctx) -> CliResult {
                 .with_sink(sink);
             eng.set_backup_tag(&backup_tag);
             let tally = eng.apply(&cfg)?;
-            actions.extend(eng.actions.iter().cloned());
+            actions.append(&mut eng.actions);
             tally
         };
-        totals = add(totals, tally);
+        totals += tally;
     }
 
     if !args.dry_run
@@ -72,6 +72,10 @@ pub fn run(args: &ApplyArgs, ctx: &mut Ctx) -> CliResult {
             links: collect_links(&actions),
         })
     {
+        // The filesystem changes already succeeded; only the state record
+        // failed. Surface it on stderr (not just the log) so the user knows
+        // `status`/`doctor` will report stale data — but don't undo the apply.
+        eprintln!("dfm: warning: could not save state ({e}); status/doctor may be stale");
         log::warn!("state save: {e}");
     }
 
@@ -108,18 +112,4 @@ fn collect_links(actions: &[Action]) -> Vec<Link> {
             source: a.to.clone(),
         })
         .collect()
-}
-
-/// Sum two tallies field-by-field so totals can span profiles.
-fn add(a: Tally, b: Tally) -> Tally {
-    Tally {
-        links_ok: a.links_ok + b.links_ok,
-        links_created: a.links_created + b.links_created,
-        links_relinked: a.links_relinked + b.links_relinked,
-        links_backed_up: a.links_backed_up + b.links_backed_up,
-        shell_run: a.shell_run + b.shell_run,
-        shell_failed: a.shell_failed + b.shell_failed,
-        cleaned: a.cleaned + b.cleaned,
-        created: a.created + b.created,
-    }
 }

@@ -4,9 +4,9 @@ Feel free to open a discussion, submit issues, fork the repository, and send pul
 
 - **Fork and branch**: Fork the repo and create a branch with a descriptive name tied to the issue.
 
-- **Write tests**: Add tests for new features and bug fixes. All tests must pass (`make test`) and the race detector must be clean (`make race`).
+- **Write tests**: Add tests for new features and bug fixes. All tests must pass (`cargo test`).
 
-- **Pass the linter**: Run `make lint` before pushing. The CI gate is non-negotiable.
+- **Pass the linter**: Run `cargo fmt --all --check` and `cargo clippy --all-targets --all-features -- -D warnings` before pushing. The CI gate is non-negotiable.
 
 - **Keep PRs focused**: One issue per pull request. Reference the related issue in the PR description.
 

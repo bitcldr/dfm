@@ -16,6 +16,7 @@ mod style;
 
 pub use color::{ColorEnv, ColorPolicy, SystemColorEnv};
 
+use std::borrow::Cow;
 use std::io::{self, IsTerminal, Write};
 
 use style::{BOLD, BOLD_CYAN, BOLD_GREEN, BOLD_WHITE, DIM, HI_RED, WHITE, YELLOW, arrow, paint};
@@ -385,7 +386,7 @@ impl IoStreams {
             return;
         }
         let sep = format!("{} ", paint(WHITE, ",", o));
-        let parts: Vec<String> = names.iter().map(|n| paint(DIM, n, o)).collect();
+        let parts: Vec<Cow<'_, str>> = names.iter().map(|n| paint(DIM, n, o)).collect();
         self.data(&format!(
             "{} {}\n",
             paint(WHITE, "Profiles:", o),
