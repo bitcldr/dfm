@@ -17,6 +17,10 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    # The action ref selects the compiler version used by the MSRV job and
+    # must stay synchronized with rust-toolchain.toml.
+    ignore:
+      - dependency-name: "dtolnay/rust-toolchain"
     groups:
       actions-all:
         patterns: ["*"]
